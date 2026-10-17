@@ -36,14 +36,16 @@
 package com.mchange.v2.naming;
 
 import java.beans.*;
+import java.io.*;
 import java.util.*;
 import javax.naming.*;
 import com.mchange.v2.log.*;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import javax.naming.spi.ObjectFactory;
 import com.mchange.v2.beans.BeansUtils;
 import com.mchange.v2.lang.Coerce;
-import com.mchange.v2.ser.SerializableUtils;
+import com.mchange.v2.ser.IndirectlySerialized;
 
 public class JavaBeanObjectFactory implements ObjectFactory
 {
@@ -63,11 +65,14 @@ public class JavaBeanObjectFactory implements ObjectFactory
 			RefAddr addr = (RefAddr) e.nextElement();
 			refAddrsMap.put( addr.getType(), addr );
 		    }
-		Class beanClass = Class.forName( ref.getClassName() );
+		Class beanClass = Class.forName( ref.getClassName(), false, JavaBeanObjectFactory.class.getClassLoader() );
+		if (! isReferenceBeanClass( beanClass ))
+		    throw new NamingException( this.getClass().getName() + " only restores Referenceable JavaBeans whose References a " +
+					       JavaBeanReferenceMaker.class.getName() + " makes; refusing " + beanClass.getName() + "." );
 		Set refProps = null;
 		RefAddr refPropsRefAddr = (BinaryRefAddr) refAddrsMap.remove( JavaBeanReferenceMaker.REF_PROPS_KEY );
 		if ( refPropsRefAddr != null )
-		    refProps = (Set) SerializableUtils.fromByteArray( (byte[]) refPropsRefAddr.getContent() );
+		    refProps = (Set) deserializeRefAddrContent( beanClass, (byte[]) refPropsRefAddr.getContent() );
 		Map propMap = createPropertyMap( beanClass, refAddrsMap );
 		return findBean( beanClass, propMap, refProps );
 	    }
@@ -107,7 +112,7 @@ public class JavaBeanObjectFactory implements ObjectFactory
 				if ( content.length == 0 )
 				    out.put( propertyName, NULL_TOKEN ); //we use an empty array to mean null
 				else
-				    out.put( propertyName, SerializableUtils.fromByteArray( content ) ); //this will handle "indirectly serialized" objects.
+				    out.put( propertyName, deserializeRefAddrContent( beanClass, content ) ); //this will handle "indirectly serialized" objects.
 			    }
 			else
 			    {
@@ -123,6 +128,137 @@ public class JavaBeanObjectFactory implements ObjectFactory
 		    logger.warning(this.getClass().getName() + " -- RefAddr for unknown property: " + type);
 	    }
 	return out;
+    }
+
+    // Referenceable, with a JavaBeanReferenceMaker field in its hierarchy: the beans PropertyReferenceableExtension
+    // generates, and hand-written ones following that pattern. Must not initialize the class.
+    static boolean isReferenceBeanClass( Class c )
+    {
+	if ( c.isArray() || c.isPrimitive() || ! Referenceable.class.isAssignableFrom( c ) )
+	    return false;
+	try
+	    {
+		for (Class k = c; k != null; k = k.getSuperclass())
+		    {
+			Field[] fields = k.getDeclaredFields();
+			for (int i = 0, len = fields.length; i < len; ++i)
+			    if ( JavaBeanReferenceMaker.class.isAssignableFrom( fields[i].getType() ) )
+				return true;
+		    }
+		return false;
+	    }
+	catch ( LinkageError e )
+	    { return false; }
+	catch ( SecurityException e )
+	    { return false; }
+    }
+
+    private static Object deserializeRefAddrContent( Class beanClass, byte[] content ) throws IOException, ClassNotFoundException
+    {
+	ObjectInputStream in = new RefAddrContentInputStream( beanClass, content );
+	try
+	    {
+		Object out = in.readObject();
+		if (out instanceof IndirectlySerialized)
+		    out = ((IndirectlySerialized) out).getObject();
+		return out;
+	    }
+	finally
+	    { in.close(); }
+    }
+
+    private final static Set ACCEPTABLE_VALUE_CLASS_NAMES = new HashSet( Arrays.asList( new String[] {
+	"java.lang.String", "java.lang.Number", "java.lang.Boolean", "java.lang.Character", "java.lang.Byte", "java.lang.Short",
+	"java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double",
+	"java.util.Hashtable", "java.util.Properties", "java.util.HashMap", "java.util.LinkedHashMap",
+	"java.util.HashSet", "java.util.LinkedHashSet", "java.util.ArrayList", "java.util.LinkedList", "java.util.Vector",
+	"java.util.Arrays$ArrayList", "java.util.CollSer",
+	"java.util.Collections$UnmodifiableCollection", "java.util.Collections$UnmodifiableSet", "java.util.Collections$UnmodifiableList",
+	"java.util.Collections$UnmodifiableRandomAccessList", "java.util.Collections$UnmodifiableMap",
+	"java.util.Collections$SynchronizedCollection", "java.util.Collections$SynchronizedSet", "java.util.Collections$SynchronizedList",
+	"java.util.Collections$SynchronizedRandomAccessList", "java.util.Collections$SynchronizedMap",
+	"java.util.Collections$EmptySet", "java.util.Collections$EmptyList", "java.util.Collections$EmptyMap",
+	"java.util.Collections$SingletonSet", "java.util.Collections$SingletonList", "java.util.Collections$SingletonMap",
+	"javax.naming.Reference", "javax.naming.RefAddr", "javax.naming.StringRefAddr", "javax.naming.BinaryRefAddr",
+	"javax.naming.CompositeName", "javax.naming.CompoundName", "javax.naming.ldap.LdapName",
+	"com.mchange.v2.naming.ReferenceIndirector$ReferenceSerialized" // dereferenced only through ReferenceableUtils' guards
+    } ) );
+
+    private final static class RefAddrContentInputStream extends ObjectInputStream
+    {
+	final List anchors  = new ArrayList();
+	final Set  admitted = new HashSet();
+
+	RefAddrContentInputStream( Class beanClass, byte[] content ) throws IOException
+	{
+	    super( new ByteArrayInputStream( content ) );
+	    addAnchors( beanClass );
+	}
+
+	private void addAnchors( Class c )
+	{
+	    for (Class k = c; k != null; k = k.getSuperclass())
+		{
+		    String name = k.getName();
+		    if ( Referenceable.class.isAssignableFrom( k ) && ! name.startsWith( "java." ) && ! name.startsWith( "javax." ) )
+			anchors.add( k );
+		}
+	}
+
+	private static String packageOf( Class c )
+	{
+	    String name = c.getName();
+	    int dot = name.lastIndexOf( '.' );
+	    return ( dot < 0 ? "" : name.substring( 0, dot ) );
+	}
+
+	private boolean inAnchorPackage( Class c )
+	{
+	    String pkg = packageOf( c );
+	    for (int i = 0, len = anchors.size(); i < len; ++i)
+		{
+		    Class anchor = (Class) anchors.get( i );
+		    if ( anchor.getClassLoader() == c.getClassLoader() && packageOf( anchor ).equals( pkg ) )
+			return true;
+		}
+	    return false;
+	}
+
+	private boolean acceptable( Class c )
+	{
+	    if ( admitted.contains( c ) )
+		return true;
+	    if ( c.isArray() )
+		{
+		    Class component = c.getComponentType();
+		    while ( component.isArray() )
+			component = component.getComponentType();
+		    return component.isPrimitive() || component == Object.class || acceptable( component );
+		}
+	    if ( ACCEPTABLE_VALUE_CLASS_NAMES.contains( c.getName() ) )
+		return true;
+	    if ( inAnchorPackage( c ) )
+		return true;
+	    if ( isReferenceBeanClass( c ) )
+		{
+		    addAnchors( c );
+		    return true;
+		}
+	    return false;
+	}
+
+	protected Class resolveClass( ObjectStreamClass desc ) throws IOException, ClassNotFoundException
+	{
+	    Class c = super.resolveClass( desc );
+	    if (! acceptable( c ))
+		throw new InvalidClassException( c.getName(), "not acceptable in the BinaryRefAddr content of a JavaBean Reference" );
+	    for (Class k = c; k != null; k = k.getSuperclass())
+		admitted.add( k );
+	    return c;
+	}
+
+	protected Class resolveProxyClass( String[] interfaces ) throws IOException, ClassNotFoundException
+	{ throw new InvalidClassException( "proxy", "not acceptable in the BinaryRefAddr content of a JavaBean Reference" ); }
     }
 
     protected Object createBlankInstance(Class beanClass) throws Exception
