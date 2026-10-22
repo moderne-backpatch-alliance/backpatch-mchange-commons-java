@@ -1,6 +1,6 @@
 schema: osera-patch-evidence/0.1.0
 producer: moderne
-release: 0.2.20.1-backpatch-00001
+release: 0.2.20.1-backpatch-00002
 baseline: v0.2.20+backpatch.baseline
 fixes:
   - cve: CVE-2026-27727
@@ -10,12 +10,20 @@ fixes:
     basis: adapted
     artifacts:
       - com.mchange:mchange-commons-java
-    note: New in this release; adapted onto 0.2.20; fixed at 0.2.20.1-backpatch-00001 (backpatch-mchange-commons-java@feadced).
+    note: Carried from 0.2.20.1-backpatch-00001.
+  - cve: CVE-2026-55153
+    advisory_url: https://nvd.nist.gov/vuln/detail/CVE-2026-55153
+    patch_commit_url: https://github.com/moderne-backpatch-alliance/backpatch-mchange-commons-java/commit/1804dcf
+    not_applicable_rationale: a provider-developed fix; no upstream-authored code to credit
+    basis: original
+    artifacts:
+      - com.mchange:mchange-commons-java
+    note: New in this release; written for 0.2.20; fixed at 0.2.20.1-backpatch-00002 (backpatch-mchange-commons-java@1804dcf).
 tests:
-  commit: feadcedf28fe046c90cafcf7bfadbaad221545c1
+  commit: 1804dcf41631f7dfbf37148eb344da25bd5d630f
   command: "JAVA_HOME=<jdk-11> /bin/bash <alliance>/work/wave2/items/scripts/mchange-commons-java-0.2.20.sh suite <m2> "
   runtime: Azul Zulu (Java 11.0.20), JUnit Platform Console Launcher 1.10.2, macOS aarch64
-  report: mchange-commons-java-0.2.20.1-backpatch-00001-tests.zip
-  report_sha256: ce9517f7272767c193c5dba7e823f8a2520e96fe9cd2487a0b06eed6b1d70826
+  report: mchange-commons-java-0.2.20.1-backpatch-00002-tests.zip
+  report_sha256: b1684a87fa89a50f1af086ec8b05ae8fea3b7a3ac695705ddd7abb6a3875026a
   result: pass
-  note: "the full suite at the tested commit, 130 tests run, 10 failed, each failing at the baseline v0.2.20+backpatch.baseline too (the same suite there: 24 run, 10 failed), 0 skipped; the regression tests for CVE-2026-27727 are ReferenceDereferenceDefaultsJUnitTestCase"
+  note: "run at 95852f66b0df, whose tree equals this commit's apart from .backpatch/patch-evidence.yaml; the full suite at the tested commit, 139 tests run, 10 failed, each failing at the baseline v0.2.20+backpatch.baseline too (the same suite there: 24 run, 10 failed), 0 skipped; the regression tests for CVE-2026-55153 are C3P0ReferenceCompatibilityJUnitTestCase, JavaBeanObjectFactoryJUnitTestCase"
