@@ -1,0 +1,21 @@
+schema: osera-patch-evidence/0.1.0
+producer: moderne
+release: 0.2.20.1-backpatch-00001
+baseline: v0.2.20+backpatch.baseline
+fixes:
+  - cve: CVE-2026-27727
+    upstream_fix_url: https://github.com/swaldman/mchange-commons-java/commit/d6f4467c8f3a9a2b8ac4673c4abd8ba2116b7fb7
+    advisory_url: https://nvd.nist.gov/vuln/detail/CVE-2026-27727
+    patch_commit_url: https://github.com/moderne-backpatch-alliance/backpatch-mchange-commons-java/commit/feadced
+    basis: adapted
+    artifacts:
+      - com.mchange:mchange-commons-java
+    note: New in this release; adapted onto 0.2.20; fixed at 0.2.20.1-backpatch-00001 (backpatch-mchange-commons-java@feadced).
+tests:
+  commit: feadcedf28fe046c90cafcf7bfadbaad221545c1
+  command: "JAVA_HOME=<jdk-11> /bin/bash <alliance>/work/wave2/batch-4/green-suites/scripts/mchange-commons-java-0.2.20-da-slf4j-test.sh suite <m2> "
+  runtime: "Azul Zulu (Java 11.0.20), JUnit Platform Console Launcher 1.10.2, macOS aarch64"
+  report: mchange-commons-java-0.2.20.1-backpatch-00001-tests.zip
+  report_sha256: 08b8826a42537c68a55a8e83cce2412a8a5d28fe5f5b70f5ac50ad924d27b7d8
+  result: pass
+  note: "the full suite at the tested commit, 130 tests run, 0 failed, 0 skipped; assertions on (-ea) except in Slf4jMLogJUnitTestCase, whose setUp asserts warn.isTraceEnabled() where it means the trace logger, which -ea always fails; the regression tests for CVE-2026-27727 are ReferenceDereferenceDefaultsJUnitTestCase"
