@@ -21,9 +21,9 @@ fixes:
     note: New in this release; written for 0.2.20; fixed at 0.2.20.1-backpatch-00002 (backpatch-mchange-commons-java@1804dcf).
 tests:
   commit: 1804dcf41631f7dfbf37148eb344da25bd5d630f
-  command: "JAVA_HOME=<jdk-11> /bin/bash <alliance>/work/wave2/items/scripts/mchange-commons-java-0.2.20.sh suite <m2> "
-  runtime: Azul Zulu (Java 11.0.20), JUnit Platform Console Launcher 1.10.2, macOS aarch64
+  command: "JAVA_HOME=<jdk-11> /bin/bash <alliance>/work/wave2/batch-4/green-suites/scripts/mchange-commons-java-0.2.20-da-slf4j-test.sh suite <m2> "
+  runtime: "Azul Zulu (Java 11.0.20), JUnit Platform Console Launcher 1.10.2, macOS aarch64"
   report: mchange-commons-java-0.2.20.1-backpatch-00002-tests.zip
-  report_sha256: b1684a87fa89a50f1af086ec8b05ae8fea3b7a3ac695705ddd7abb6a3875026a
+  report_sha256: 37a7ef0c9d9930933dc0e4595214fdc3ffc735397be23c0ecaa9c79ffc20e5e4
   result: pass
-  note: "run at 95852f66b0df, whose tree equals this commit's apart from .backpatch/patch-evidence.yaml; the full suite at the tested commit, 139 tests run, 10 failed, each failing at the baseline v0.2.20+backpatch.baseline too (the same suite there: 24 run, 10 failed), 0 skipped; the regression tests for CVE-2026-55153 are C3P0ReferenceCompatibilityJUnitTestCase, JavaBeanObjectFactoryJUnitTestCase"
+  note: "the full suite at the tested commit, 139 tests run, 0 failed, 0 skipped; assertions on (-ea) except in Slf4jMLogJUnitTestCase, whose setUp asserts warn.isTraceEnabled() where it means the trace logger, which -ea always fails; the regression tests for CVE-2026-55153 are C3P0ReferenceCompatibilityJUnitTestCase, JavaBeanObjectFactoryJUnitTestCase"
